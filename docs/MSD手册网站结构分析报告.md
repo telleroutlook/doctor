@@ -130,11 +130,9 @@ https://www.msdmanuals.com/home/blood-disorders/iron-deficiency-anemia
 第2层：/cardiovascular-disorders/ (主分类)
 第3层：/hypertension/ (具体主题)
 
-多语言支持：
+双语支持：
 https://www.msdmanuals.cn/... (中文版)
-https://www.msdmanuals.de/... (德文版)
-https://www.msdmanuals.fr/... (法文版)
-...
+https://www.msdmanuals.com/... (英文版)
 ```
 
 ### URL编码规范
@@ -236,12 +234,12 @@ Disallow: */professional/monograph/*
 - ✅ 全局爬虫延迟：5秒（重要！）
 - ❌ 禁止抓取药品名称和药物概述页面
 - ❌ 禁止抓取自定义和CMS路径
-- ✅ 提供16种语言版本的sitemap
+- ✅ 官方 sitemap 覆盖多语言，但本系统仅保留简体中文与英文入口
 
 ### Sitemap结构
 ```
 支持语言版本：
-de, en, es, fr, it, ja-jp, ko, pt, ru, ru-ru, ar, vi, uk, hi, sw, id
+en, zh
 
 Sitemap URL模式：
 https://www.msdmanuals.com/[语言]/sitemap.xml
@@ -390,7 +388,7 @@ DATA_PROCESSING_PIPELINE = [
 ### 内容统计
 - **总页面数：** 估计50,000-100,000页
 - **医学主题：** 约26个主分类，每个分类200-500个主题
-- **语言版本：** 16种语言（主要关注中文和英文）
+- **语言版本：** 2种语言（简体中文、英文）
 - **文件类型：** HTML文本、图片、PDF下载、视频
 
 ### 数据容量估算
@@ -441,13 +439,13 @@ DATA_PROCESSING_PIPELINE = [
 1. **网站结构清晰**：采用标准的三版本架构，内容组织合理
 2. **URL模式规律**：遵循清晰的层级结构，便于程序解析
 3. **反爬虫控制**：有明确的robots.txt政策，需要严格遵守
-4. **多语言支持**：支持16种语言，内容丰富
+4. **双语支持**：支持简体中文与英文内容，覆盖关键医学主题
 
 ### 实施建议
 1. **优先抓取策略**
    - 先抓取英文版（内容最完整）
    - 再抓取中文版（使用需求最高）
-   - 最后抓取其他语言版本
+   - 最后对中英文差异内容进行校验与补充
 
 2. **分阶段实施**
    - 第一阶段：主页和分类页

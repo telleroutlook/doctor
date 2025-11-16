@@ -42,8 +42,8 @@ def main():
                        help='配置文件路径')
     parser.add_argument('--output', default='data/output', 
                        help='输出目录')
-    parser.add_argument('--language', default='en', 
-                       help='爬取语言版本 (en, zh, fr, etc.)')
+    parser.add_argument('--language', default='en',
+                        help='爬取语言版本 (en 或 zh)')
     parser.add_argument('--version', default='home', 
                        help='爬取版本 (home, professional, veterinary)')
     parser.add_argument('--max-pages', type=int, default=1000,

@@ -212,17 +212,9 @@ class DataProcessor:
             'zh-tw': 'zh',
             'en': 'en',
             'en-us': 'en',
-            'en-gb': 'en',
-            'fr': 'fr',
-            'de': 'de',
-            'es': 'es',
-            'it': 'it',
-            'ja': 'ja',
-            'ko': 'ko',
-            'pt': 'pt',
-            'ru': 'ru'
+            'en-gb': 'en'
         }
-        
+
         return language_map.get(language.lower(), language.lower())
     
     def _filter_medical_terms(self, medical_terms):
