@@ -1,6 +1,48 @@
 # 爬虫配置
 import random
 
+# 支持的语言版本及入口URL
+LANGUAGE_VERSION_URLS = {
+    "home": {
+        "en": {
+            "start_url": "https://www.msdmanuals.com/home/",
+            "extra_urls": ["health-topics/"]
+        },
+        "zh": {
+            "start_url": "https://www.msdmanuals.cn/home/",
+            "extra_urls": ["health-topics/", "https://www.msdmanuals.cn/"]
+        },
+        "de": "https://www.msdmanuals.com/de/",
+        "es": "https://www.msdmanuals.com/es/",
+        "fr": "https://www.msdmanuals.com/fr/",
+        "it": "https://www.msdmanuals.com/it/",
+        "ja-jp": "https://www.msdmanuals.com/ja-jp/",
+        "ko": "https://www.msdmanuals.com/ko/",
+        "pt": "https://www.msdmanuals.com/pt/",
+        "ru": "https://www.msdmanuals.com/ru/",
+        "ru-ru": "https://www.msdmanuals.com/ru-ru/",
+        "ar": "https://www.msdmanuals.com/ar/",
+        "vi": "https://www.msdmanuals.com/vi/",
+        "uk": "https://www.msdmanuals.com/uk/",
+        "hi": "https://www.msdmanuals.com/hi/",
+        "sw": "https://www.msdmanuals.com/sw/",
+        "id": "https://www.msdmanuals.com/id/"
+    },
+    "professional": {
+        "en": {
+            "start_url": "https://www.msdmanuals.com/professional/"
+        },
+        "zh": {
+            "start_url": "https://www.msdmanuals.cn/professional/"
+        }
+    },
+    "veterinary": {
+        "en": {
+            "start_url": "https://www.msdvetmanual.com/"
+        }
+    }
+}
+
 # 爬虫基础配置
 CRAWLER_CONFIG = {
     "max_workers": 3,

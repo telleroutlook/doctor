@@ -232,6 +232,34 @@ def test_crawler_initialization():
         traceback.print_exc()
         return False
 
+def test_language_version_pairs():
+    """测试多语言组合生成"""
+    print("\n🌍 测试多语言配置...")
+
+    try:
+        from crawler.main_crawler import MSDManualsCrawler
+
+        crawler = MSDManualsCrawler()
+        all_pairs = crawler.get_language_version_pairs()
+        print(f"✅ 当前支持 {len(all_pairs)} 组语言-版本组合")
+
+        assert ("en", "home") in all_pairs
+
+        zh_pairs = crawler.get_language_version_pairs(language='zh')
+        versions = {version for _, version in zh_pairs}
+        assert 'home' in versions
+        assert 'professional' in versions
+
+        home_pairs = crawler.get_language_version_pairs(version='home')
+        assert len(home_pairs) >= len(zh_pairs)
+
+        return True
+    except Exception as e:
+        print(f"❌ 多语言配置测试失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def main():
     """主测试函数"""
     print("🚀 开始爬虫系统测试\\n")
@@ -241,7 +269,8 @@ def main():
         ("数据库功能", test_database),
         ("内容解析器", test_parser),
         ("数据处理器", test_processor),
-        ("爬虫初始化", test_crawler_initialization)
+        ("爬虫初始化", test_crawler_initialization),
+        ("多语言配置", test_language_version_pairs)
     ]
     
     passed = 0

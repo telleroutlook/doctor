@@ -10,6 +10,7 @@ import time
 import hashlib
 import logging
 import requests
+import random
 from urllib.parse import urljoin, urlparse
 from pathlib import Path
 from datetime import datetime
@@ -114,9 +115,12 @@ class MSDManualsCrawler:
         self.db_manager = DatabaseManager(use_sqlite=True)
         self.content_parser = MSDContentParser()
         self.data_processor = DataProcessor()
-        
+
         # 状态管理
         self.state_manager = CrawlerState()
+
+        # 支持的语言-版本配置
+        self.language_versions = self.config.get('language_versions', {})
         
         # 请求会话
         self.session = requests.Session()
@@ -141,14 +145,15 @@ class MSDManualsCrawler:
             spec = importlib.util.spec_from_file_location("config", config_path)
             config_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(config_module)
-            
+
             return {
                 'crawler': config_module.CRAWLER_CONFIG,
                 'user_agents': config_module.USER_AGENTS,
                 'headers': config_module.DEFAULT_HEADERS,
                 'domain_configs': config_module.DOMAIN_CONFIGS,
                 'retry': config_module.RETRY_CONFIG,
-                'state': config_module.STATE_CONFIG
+                'state': config_module.STATE_CONFIG,
+                'language_versions': getattr(config_module, 'LANGUAGE_VERSION_URLS', {})
             }
         else:
             # 使用默认配置
@@ -158,7 +163,8 @@ class MSDManualsCrawler:
                 'headers': DEFAULT_HEADERS,
                 'domain_configs': DOMAIN_CONFIGS,
                 'retry': RETRY_CONFIG,
-                'state': STATE_CONFIG
+                'state': STATE_CONFIG,
+                'language_versions': LANGUAGE_VERSION_URLS
             }
     
     def _setup_session(self):
@@ -343,12 +349,31 @@ class MSDManualsCrawler:
         
         return urls
     
+    def get_language_version_pairs(self, language=None, version=None):
+        """获取支持的语言-版本组合"""
+        pairs = []
+
+        for version_name, languages in self.language_versions.items():
+            if version and version not in ('all', version_name):
+                continue
+
+            for lang_code in languages.keys():
+                if language and language not in ('all', lang_code):
+                    continue
+                pairs.append((lang_code, version_name))
+
+        return pairs
+
     def run(self, language='en', version='home', max_pages=1000, output_dir=None):
         """运行爬虫"""
         logger.info(f"开始爬取: 语言={language}, 版本={version}, 最大页面={max_pages}")
-        
+
         self.start_time = time.time()
-        
+
+        # 清理队列和已见URL，确保多次运行互不影响
+        self.url_queue = []
+        self.seen_urls.clear()
+
         # 初始化目标URLs
         self._initialize_urls(language, version)
         
@@ -425,51 +450,34 @@ class MSDManualsCrawler:
     
     def _initialize_urls(self, language, version):
         """初始化目标URLs"""
-        base_urls = {
-            'home': {
-                'en': 'https://www.msdmanuals.com/home/',
-                'zh': 'https://www.msdmanuals.cn/home/'
-            },
-            'professional': {
-                'en': 'https://www.msdmanuals.com/professional/',
-                'zh': 'https://www.msdmanuals.cn/professional/'
-            },
-            'veterinary': {
-                'en': 'https://www.msdvetmanual.com/'
-            }
-        }
-        
-        if version in base_urls and language in base_urls[version]:
-            start_url = base_urls[version][language]
+        version_config = self.language_versions.get(version, {})
+        language_entry = version_config.get(language)
 
+        if not language_entry:
+            raise ValueError(f"不支持的语言-版本组合: {language}-{version}")
+
+        if isinstance(language_entry, str):
+            language_entry = {'start_url': language_entry}
+
+        start_url = language_entry['start_url']
+
+        self.url_queue.append({
+            'url': start_url,
+            'text': '主页',
+            'source_url': None
+        })
+
+        for extra_url in language_entry.get('extra_urls', []):
+            target_url = extra_url if extra_url.startswith('http') else urljoin(start_url, extra_url)
+            if target_url == start_url:
+                continue
             self.url_queue.append({
-                'url': start_url,
-                'text': '主页',
-                'source_url': None
+                'url': target_url,
+                'text': '附加入口',
+                'source_url': start_url
             })
 
-            # 中文站点还应该先收录根域名以免遗漏首页导航
-            if language == 'zh':
-                cn_root_url = 'https://www.msdmanuals.cn/'
-                if cn_root_url != start_url:
-                    self.url_queue.append({
-                        'url': cn_root_url,
-                        'text': '中文版入口',
-                        'source_url': None
-                    })
-
-            # 添加医学主题页面
-            if version == 'home':
-                health_topics_url = f"{start_url}health-topics/"
-                self.url_queue.append({
-                    'url': health_topics_url,
-                    'text': '健康话题',
-                    'source_url': start_url
-                })
-            
-            logger.info(f"已初始化起始URLs: {len(self.url_queue)} 个")
-        else:
-            raise ValueError(f"不支持的语言-版本组合: {language}-{version}")
+        logger.info(f"已初始化起始URLs: {len(self.url_queue)} 个")
     
     def _generate_report(self):
         """生成爬取报告"""

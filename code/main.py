@@ -57,12 +57,34 @@ def main():
     if args.command == 'crawl':
         logger.info("开始爬取数据...")
         crawler = MSDManualsCrawler(config_path=args.config)
-        crawler.run(
-            language=args.language,
-            version=args.version,
-            max_pages=args.max_pages,
-            output_dir=args.output
-        )
+        target_languages = args.language
+        target_versions = args.version
+
+        if args.language == 'all' or args.version == 'all':
+            combos = crawler.get_language_version_pairs(
+                language=None if args.language == 'all' else args.language,
+                version=None if args.version == 'all' else args.version
+            )
+
+            if not combos:
+                logger.error("未找到匹配的语言-版本组合，请检查配置")
+                sys.exit(1)
+
+            for lang, ver in combos:
+                logger.info(f"批量爬取任务: language={lang}, version={ver}")
+                crawler.run(
+                    language=lang,
+                    version=ver,
+                    max_pages=args.max_pages,
+                    output_dir=args.output
+                )
+        else:
+            crawler.run(
+                language=target_languages,
+                version=target_versions,
+                max_pages=args.max_pages,
+                output_dir=args.output
+            )
         
     elif args.command == 'setup-db':
         logger.info("初始化数据库...")
