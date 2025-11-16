@@ -30,10 +30,15 @@ logger = logging.getLogger(__name__)
 
 class CrawlerState:
     """爬虫状态管理"""
-    
+
     def __init__(self, state_file="crawler_state.json"):
         self.state_file = state_file
-        self.state = {
+        self.state = self._default_state()
+        self.load_state()
+
+    def _default_state(self):
+        """生成默认状态结构"""
+        return {
             "last_saved": None,
             "urls_processed": 0,
             "successful_downloads": 0,
@@ -50,7 +55,6 @@ class CrawlerState:
             "failed_urls": set(),
             "checkpoint_urls": []
         }
-        self.load_state()
     
     def save_state(self):
         """保存爬虫状态"""
@@ -60,10 +64,14 @@ class CrawlerState:
             state_copy = self.state.copy()
             state_copy["processed_urls"] = list(self.state["processed_urls"])
             state_copy["failed_urls"] = list(self.state["failed_urls"])
-            
+
+            state_dir = os.path.dirname(self.state_file)
+            if state_dir:
+                os.makedirs(state_dir, exist_ok=True)
+
             with open(self.state_file, 'w', encoding='utf-8') as f:
                 json.dump(state_copy, f, ensure_ascii=False, indent=2)
-            
+
             logger.info(f"状态已保存: {self.state_file}")
             
         except Exception as e:
@@ -80,7 +88,7 @@ class CrawlerState:
                 self.state.update(saved_state)
                 self.state["processed_urls"] = set(self.state["processed_urls"])
                 self.state["failed_urls"] = set(self.state["failed_urls"])
-                
+
                 logger.info(f"已加载状态: 已处理 {len(self.state['processed_urls'])} 个URL")
                 
         except Exception as e:
@@ -106,6 +114,16 @@ class CrawlerState:
             "timestamp": datetime.now().isoformat()
         })
 
+    def reset(self):
+        """重置状态，便于重新开始爬取"""
+        self.state = self._default_state()
+        if os.path.exists(self.state_file):
+            try:
+                os.remove(self.state_file)
+            except OSError as exc:
+                logger.warning(f"删除旧状态文件失败: {exc}")
+        logger.info("爬虫状态已重置")
+
 class MSDManualsCrawler:
     """默沙东诊疗手册爬虫"""
     
@@ -117,7 +135,8 @@ class MSDManualsCrawler:
         self.data_processor = DataProcessor()
 
         # 状态管理
-        self.state_manager = CrawlerState()
+        state_config = self.config.get('state', {})
+        self.state_manager = CrawlerState(state_file=state_config.get('state_file', 'crawler_state.json'))
 
         # 支持的语言-版本配置
         self.language_versions = self.config.get('language_versions', {})
@@ -364,11 +383,14 @@ class MSDManualsCrawler:
 
         return pairs
 
-    def run(self, language='en', version='home', max_pages=1000, output_dir=None):
+    def run(self, language='en', version='home', max_pages=1000, output_dir=None, reset_state=False):
         """运行爬虫"""
         logger.info(f"开始爬取: 语言={language}, 版本={version}, 最大页面={max_pages}")
 
         self.start_time = time.time()
+
+        if reset_state:
+            self.state_manager.reset()
 
         # 清理队列和已见URL，确保多次运行互不影响
         self.url_queue = []

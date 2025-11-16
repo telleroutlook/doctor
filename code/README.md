@@ -33,6 +33,9 @@ python main.py crawl --language zh --version professional --max-pages 500
 
 # 指定输出目录
 python main.py crawl --language en --version home --output ./output --max-pages 2000
+
+# 重新开始一次全量爬取
+python main.py crawl --language en --version home --reset-state --max-pages 1000
 ```
 
 ### 启动服务
@@ -47,6 +50,12 @@ python main.py search
 ### 运行测试
 ```bash
 python main.py test
+```
+
+### 数据质量检查
+```bash
+# 对最近抓取的文章进行抽样质量检查
+python main.py quality-check --sample-size 50 --min-word-count 150
 ```
 
 ## 📁 项目结构
