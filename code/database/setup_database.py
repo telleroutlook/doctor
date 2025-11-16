@@ -18,21 +18,22 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     """数据库管理器"""
-    
-    def __init__(self, use_sqlite=True, config=None):
+
+    def __init__(self, use_sqlite=True, config=None, sqlite_path=None):
         """
         初始化数据库连接
-        
+
         Args:
             use_sqlite: 是否使用SQLite（用于测试）
             config: 数据库配置
+            sqlite_path: 自定义SQLite文件路径（用于隔离测试环境）
         """
         self.use_sqlite = use_sqlite
-        
+
         if use_sqlite:
             # 使用SQLite作为数据库
-            db_path = Path("data/msd_manuals.db")
-            db_path.parent.mkdir(exist_ok=True)
+            db_path = Path(sqlite_path) if sqlite_path else Path("data/msd_manuals.db")
+            db_path.parent.mkdir(parents=True, exist_ok=True)
             self.engine = create_engine(f"sqlite:///{db_path}")
         else:
             # 使用MySQL
@@ -140,20 +141,21 @@ class DatabaseManager:
         """关闭数据库连接"""
         self.engine.dispose()
 
-def setup_database(use_sqlite=True):
+def setup_database(use_sqlite=True, sqlite_path=None):
     """设置数据库
-    
+
     Args:
         use_sqlite: 是否使用SQLite
-    
+        sqlite_path: 自定义SQLite文件路径
+
     Returns:
         DatabaseManager: 数据库管理器实例
     """
     logger.info("开始设置数据库...")
-    
+
     try:
         # 创建数据库管理器
-        db_manager = DatabaseManager(use_sqlite=use_sqlite)
+        db_manager = DatabaseManager(use_sqlite=use_sqlite, sqlite_path=sqlite_path)
         
         # 创建表
         db_manager.create_tables()

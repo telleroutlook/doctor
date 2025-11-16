@@ -2,44 +2,46 @@
 import random
 
 # 支持的语言版本及入口URL
+def _language_entry(start_url, extra_urls=None):
+    """统一生成语言入口配置"""
+    entry = {"start_url": start_url}
+    if extra_urls:
+        entry["extra_urls"] = list(extra_urls)
+    return entry
+
+
 LANGUAGE_VERSION_URLS = {
     "home": {
-        "en": {
-            "start_url": "https://www.msdmanuals.com/home/",
-            "extra_urls": ["health-topics/"]
-        },
-        "zh": {
-            "start_url": "https://www.msdmanuals.cn/home/",
-            "extra_urls": ["health-topics/", "https://www.msdmanuals.cn/"]
-        },
-        "de": "https://www.msdmanuals.com/de/",
-        "es": "https://www.msdmanuals.com/es/",
-        "fr": "https://www.msdmanuals.com/fr/",
-        "it": "https://www.msdmanuals.com/it/",
-        "ja-jp": "https://www.msdmanuals.com/ja-jp/",
-        "ko": "https://www.msdmanuals.com/ko/",
-        "pt": "https://www.msdmanuals.com/pt/",
-        "ru": "https://www.msdmanuals.com/ru/",
-        "ru-ru": "https://www.msdmanuals.com/ru-ru/",
-        "ar": "https://www.msdmanuals.com/ar/",
-        "vi": "https://www.msdmanuals.com/vi/",
-        "uk": "https://www.msdmanuals.com/uk/",
-        "hi": "https://www.msdmanuals.com/hi/",
-        "sw": "https://www.msdmanuals.com/sw/",
-        "id": "https://www.msdmanuals.com/id/"
+        "en": _language_entry(
+            "https://www.msdmanuals.com/home/",
+            extra_urls=["health-topics/"]
+        ),
+        "zh": _language_entry(
+            "https://www.msdmanuals.cn/home/",
+            extra_urls=["health-topics/", "https://www.msdmanuals.cn/"]
+        ),
+        "de": _language_entry("https://www.msdmanuals.com/de/"),
+        "es": _language_entry("https://www.msdmanuals.com/es/"),
+        "fr": _language_entry("https://www.msdmanuals.com/fr/"),
+        "it": _language_entry("https://www.msdmanuals.com/it/"),
+        "ja-jp": _language_entry("https://www.msdmanuals.com/ja-jp/"),
+        "ko": _language_entry("https://www.msdmanuals.com/ko/"),
+        "pt": _language_entry("https://www.msdmanuals.com/pt/"),
+        "ru": _language_entry("https://www.msdmanuals.com/ru/"),
+        "ru-ru": _language_entry("https://www.msdmanuals.com/ru-ru/"),
+        "ar": _language_entry("https://www.msdmanuals.com/ar/"),
+        "vi": _language_entry("https://www.msdmanuals.com/vi/"),
+        "uk": _language_entry("https://www.msdmanuals.com/uk/"),
+        "hi": _language_entry("https://www.msdmanuals.com/hi/"),
+        "sw": _language_entry("https://www.msdmanuals.com/sw/"),
+        "id": _language_entry("https://www.msdmanuals.com/id/")
     },
     "professional": {
-        "en": {
-            "start_url": "https://www.msdmanuals.com/professional/"
-        },
-        "zh": {
-            "start_url": "https://www.msdmanuals.cn/professional/"
-        }
+        "en": _language_entry("https://www.msdmanuals.com/professional/"),
+        "zh": _language_entry("https://www.msdmanuals.cn/professional/")
     },
     "veterinary": {
-        "en": {
-            "start_url": "https://www.msdvetmanual.com/"
-        }
+        "en": _language_entry("https://www.msdvetmanual.com/")
     }
 }
 
