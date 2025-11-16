@@ -104,7 +104,7 @@ def interactive_search(db):
             
             # 可选的过滤条件
             print("\\n⚙️  可选过滤条件 (直接回车跳过):")
-            language_input = input("🌐 语言 (zh/en/fr/de...): ").strip()
+            language_input = input("🌐 语言 (zh/en): ").strip()
             category_input = input("🏷️  分类: ").strip()
             
             # 执行搜索

@@ -19,22 +19,7 @@ LANGUAGE_VERSION_URLS = {
         "zh": _language_entry(
             "https://www.msdmanuals.cn/home/",
             extra_urls=["health-topics/", "https://www.msdmanuals.cn/"]
-        ),
-        "de": _language_entry("https://www.msdmanuals.com/de/"),
-        "es": _language_entry("https://www.msdmanuals.com/es/"),
-        "fr": _language_entry("https://www.msdmanuals.com/fr/"),
-        "it": _language_entry("https://www.msdmanuals.com/it/"),
-        "ja-jp": _language_entry("https://www.msdmanuals.com/ja-jp/"),
-        "ko": _language_entry("https://www.msdmanuals.com/ko/"),
-        "pt": _language_entry("https://www.msdmanuals.com/pt/"),
-        "ru": _language_entry("https://www.msdmanuals.com/ru/"),
-        "ru-ru": _language_entry("https://www.msdmanuals.com/ru-ru/"),
-        "ar": _language_entry("https://www.msdmanuals.com/ar/"),
-        "vi": _language_entry("https://www.msdmanuals.com/vi/"),
-        "uk": _language_entry("https://www.msdmanuals.com/uk/"),
-        "hi": _language_entry("https://www.msdmanuals.com/hi/"),
-        "sw": _language_entry("https://www.msdmanuals.com/sw/"),
-        "id": _language_entry("https://www.msdmanuals.com/id/")
+        )
     },
     "professional": {
         "en": _language_entry("https://www.msdmanuals.com/professional/"),

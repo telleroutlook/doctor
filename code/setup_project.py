@@ -268,8 +268,8 @@ def main():
                        help='配置文件路径')
     parser.add_argument('--output', default='data/output', 
                        help='输出目录')
-    parser.add_argument('--language', default='en', 
-                       help='爬取语言版本 (en, zh, fr, etc.)')
+    parser.add_argument('--language', default='en',
+                        help='爬取语言版本 (en 或 zh)')
     parser.add_argument('--version', default='home', 
                        help='爬取版本 (home, professional, veterinary)')
     parser.add_argument('--max-pages', type=int, default=1000, 
@@ -494,7 +494,7 @@ def create_readme():
 
 - **合规抓取**: 严格遵守robots.txt政策，智能频率控制
 - **医学解析**: 专门优化的医学内容解析器
-- **多语言支持**: 支持16种语言版本的抓取
+- **双语支持**: 聚焦简体中文与英文版本的抓取
 - **智能搜索**: 基于自然语言处理的全文检索
 - **增量更新**: 支持断点续传和增量更新
 - **质量保证**: 完整的数据质量检查机制
