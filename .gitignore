@@ -1,0 +1,23 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+# Virtual environments
+.venv/
+venv/
+env/
+# Logs and output
+*.log
+output/
+logs/
+# Distribution
+build/
+dist/
+*.egg-info/
+# SQLite/db files
+*.db
+# IDEs
+.vscode/
+.idea/
+# dotenv files
+.env
