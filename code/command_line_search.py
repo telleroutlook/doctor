@@ -38,16 +38,15 @@ def print_article(article, show_content=False):
 def search_articles(db, query, language=None, category=None, limit=10):
     """搜索文章"""
     try:
-        results = db.search_articles(
+        return db.search_articles(
             query=query,
             language=language,
             category=category,
             limit=limit
         )
-        return results
     except Exception as e:
         print(f"❌ 搜索失败: {e}")
-        return []
+        return [], 0
 
 def show_statistics(db):
     """显示统计信息"""
@@ -110,7 +109,7 @@ def interactive_search(db):
             
             # 执行搜索
             print(f"\\n🔍 正在搜索: {query}")
-            results = search_articles(
+            results, total = search_articles(
                 db, 
                 query, 
                 language=language_input if language_input else None,
@@ -119,7 +118,7 @@ def interactive_search(db):
             )
             
             if results:
-                print(f"\\n✅ 找到 {len(results)} 个结果:")
+                print(f"\n✅ 找到 {len(results)} / {total} 个匹配结果（仅显示 {len(results)} 条）:")
                 print("=" * 60)
                 
                 for i, article in enumerate(results, 1):
@@ -211,9 +210,9 @@ def main():
             elif choice == '2':
                 query = input("\\n🔎 请输入搜索词: ").strip()
                 if query:
-                    results = search_articles(db, query, limit=10)
+                    results, total = search_articles(db, query, limit=10)
                     if results:
-                        print(f"\\n✅ 找到 {len(results)} 个结果:")
+                        print(f"\n✅ 找到 {len(results)} / {total} 个匹配结果:")
                         for i, article in enumerate(results, 1):
                             print(f"[{i}] ", end="")
                             print_article(article)

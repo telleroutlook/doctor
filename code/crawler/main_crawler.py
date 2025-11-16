@@ -21,6 +21,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from config.crawler_config import *
 from database.setup_database import DatabaseManager
+from database.models import Article as ArticleModel
 from parsers.content_parser import MSDContentParser
 from processors.data_processor import DataProcessor
 
@@ -35,6 +36,7 @@ class CrawlerState:
             "last_saved": None,
             "urls_processed": 0,
             "successful_downloads": 0,
+            "landing_pages_skipped": 0,
             "failed_downloads": 0,
             "parse_errors": 0,
             "duplicates_found": 0,
@@ -127,6 +129,7 @@ class MSDManualsCrawler:
         # 性能监控
         self.start_time = None
         self.stats = defaultdict(int)
+        self._landing_page_skip_logged = False
         
         logger.info("爬虫初始化完成")
     
@@ -254,6 +257,15 @@ class MSDManualsCrawler:
         try:
             # 使用内容解析器解析
             parsed_data = self.content_parser.parse(response)
+
+            if parsed_data is None:
+                self.stats['landing_pages_skipped'] += 1
+                if not self._landing_page_skip_logged:
+                    logger.info(
+                        "跳过疑似导航/概览页: %s (本次运行只记录首次跳过事件)", response.url
+                    )
+                    self._landing_page_skip_logged = True
+                return None
             
             # 处理和验证数据
             processed_data = self.data_processor.process(parsed_data)
@@ -267,26 +279,24 @@ class MSDManualsCrawler:
     def _save_to_database(self, data):
         """保存数据到数据库"""
         session = self.db_manager.get_session()
-        
+
         try:
-            # 检查是否已存在
-            existing_article = session.query(self.db_manager.get_session().query(self.db_manager.db_manager.__class__).filter_by(url=data['url']).first())
-            
-            # 使用正确的模型类
-            Article = self.db_manager.get_session().query(self.db_manager.get_session().query(self.db_manager.db_manager.__class__).filter_by(url=data['url']).first())
-            
-            # 计算内容hash用于去重
+            existing_article = session.query(ArticleModel).filter_by(url=data['url']).first()
+
             content_hash = hashlib.sha256(data.get('content', '').encode('utf-8')).hexdigest()
-            
+
             if existing_article:
-                # 更新现有记录
                 existing_article.title = data.get('title', existing_article.title)
                 existing_article.content = data.get('content', existing_article.content)
+                existing_article.category = data.get('category', existing_article.category)
+                existing_article.subcategory = data.get('subcategory', existing_article.subcategory)
+                existing_article.language = data.get('language', existing_article.language)
+                existing_article.version = data.get('version', existing_article.version)
+                existing_article.hash_content = content_hash
+                existing_article.word_count = len(data.get('content', '').split()) if data.get('content') else existing_article.word_count
                 existing_article.updated_at = datetime.utcnow()
                 self.state_manager.update_stats(existing_articles_updated=1)
             else:
-                # 创建新记录
-                from database.models import Article as ArticleModel
                 article = ArticleModel(
                     url=data['url'],
                     title=data.get('title', ''),
@@ -300,9 +310,9 @@ class MSDManualsCrawler:
                 )
                 session.add(article)
                 self.state_manager.update_stats(new_articles_created=1)
-            
+
             session.commit()
-            
+
         except Exception as e:
             session.rollback()
             logger.error(f"保存数据失败: {e}")
@@ -361,20 +371,24 @@ class MSDManualsCrawler:
                     
                     # 解析内容
                     parsed_data = self._parse_page(response)
-                    
-                    # 保存数据
-                    self._save_to_database(parsed_data)
-                    
+                    landing_skipped = parsed_data is None
+
+                    # 保存数据（导航/概览页不保存）
+                    if not landing_skipped:
+                        self._save_to_database(parsed_data)
+
                     # 发现新URLs
                     new_urls = self.discover_urls(response)
                     self.url_queue.extend(new_urls)
-                    
+
                     # 更新统计
-                    self.state_manager.update_stats(
-                        successful_downloads=1,
-                        urls_processed=1
-                    )
-                    
+                    stats_update = {'urls_processed': 1}
+                    if landing_skipped:
+                        stats_update['landing_pages_skipped'] = 1
+                    else:
+                        stats_update['successful_downloads'] = 1
+                    self.state_manager.update_stats(**stats_update)
+
                     pages_crawled += 1
                     
                     # 定期保存状态
@@ -427,13 +441,23 @@ class MSDManualsCrawler:
         
         if version in base_urls and language in base_urls[version]:
             start_url = base_urls[version][language]
-            
+
             self.url_queue.append({
                 'url': start_url,
                 'text': '主页',
                 'source_url': None
             })
-            
+
+            # 中文站点还应该先收录根域名以免遗漏首页导航
+            if language == 'zh':
+                cn_root_url = 'https://www.msdmanuals.cn/'
+                if cn_root_url != start_url:
+                    self.url_queue.append({
+                        'url': cn_root_url,
+                        'text': '中文版入口',
+                        'source_url': None
+                    })
+
             # 添加医学主题页面
             if version == 'home':
                 health_topics_url = f"{start_url}health-topics/"
@@ -460,6 +484,7 @@ class MSDManualsCrawler:
         - 处理时间: {state['processing_time']:.2f} 秒
         - 已处理URLs: {state['urls_processed']}
         - 成功下载: {state['successful_downloads']}
+        - 跳过导航页: {state['landing_pages_skipped']}
         - 下载失败: {state['failed_downloads']}
         - 解析错误: {state['parse_errors']}
         - 重复发现: {state['duplicates_found']}

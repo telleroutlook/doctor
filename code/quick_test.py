@@ -37,8 +37,8 @@ def quick_test():
     for query in test_queries:
         print(f"\\n🔍 搜索: '{query}'")
         try:
-            results = db.search_articles(query, limit=5)
-            print(f"  找到 {len(results)} 个结果")
+            results, total = db.search_articles(query, limit=5)
+            print(f"  找到 {len(results)} / {total} 个匹配结果")
             
             if results:
                 for i, result in enumerate(results, 1):

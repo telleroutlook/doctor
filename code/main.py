@@ -20,11 +20,14 @@ from web_interface.app import create_search_interface
 
 def setup_logging():
     """设置日志配置"""
+    log_dir = project_root / 'logs'
+    log_dir.mkdir(parents=True, exist_ok=True)
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler('logs/crawler.log'),
+            logging.FileHandler(log_dir / 'crawler.log'),
             logging.StreamHandler(sys.stdout)
         ]
     )

@@ -27,6 +27,8 @@ class MedicalDatabase:
         
         # 初始化数据库
         self._init_database()
+        self._seeded = False
+        self.seed_from_crawler_outputs()
     
     def _init_database(self):
         """初始化数据库和表结构"""
@@ -266,6 +268,79 @@ class MedicalDatabase:
             return text.strip()
         
         conn.create_function("clean_text", 1, clean_text)
+
+    def seed_from_crawler_outputs(self, force=False, rebuild_fts=True):
+        """从爬虫输出包填充文章并重建FTS索引"""
+        if self._seeded and not force:
+            logger.debug("已对搜索数据库执行过爬虫数据导入，跳过重复运行")
+            return 0
+
+        output_dir = self.db_dir / "output"
+        if not output_dir.exists():
+            logger.debug("爬虫输出目录不存在: %s", output_dir)
+            return 0
+
+        articles = []
+
+        crawler_results = output_dir / "crawler_results.json"
+        if crawler_results.exists():
+            try:
+                with crawler_results.open("r", encoding="utf-8") as crawler_file:
+                    data = json.load(crawler_file)
+                    articles.extend(data.get("articles", []))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("解析爬虫汇总文件失败(%s): %s", crawler_results, exc)
+
+        for article_path in sorted(output_dir.glob("article_*.json")):
+            try:
+                with article_path.open("r", encoding="utf-8") as article_file:
+                    articles.append(json.load(article_file))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("跳过无效文章文件(%s): %s", article_path, exc)
+
+        if not articles:
+            logger.debug("爬虫输出中未发现文章数据")
+            self._seeded = True
+            return 0
+
+        seen_urls = set()
+        unique_articles = []
+        for article in articles:
+            url = article.get("url")
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            unique_articles.append(article)
+
+        processed = 0
+        for article in unique_articles:
+            try:
+                self.insert_article(article)
+                processed += 1
+            except sqlite3.IntegrityError as exc:
+                logger.debug("文章已存在或违反唯一性(%s): %s", article.get("url"), exc)
+            except Exception as exc:
+                logger.error("导入文章(%s)失败: %s", article.get("url"), exc)
+
+        if processed and rebuild_fts:
+            self._rebuild_fts()
+
+        logger.info("已从爬虫输出导入 %d 篇文章", processed)
+        self._seeded = True
+        return processed
+
+    def _rebuild_fts(self):
+        """触发全文搜索索引重建"""
+        conn = self.get_connection()
+        try:
+            conn.execute("INSERT INTO articles_fts(articles_fts) VALUES('rebuild')")
+            conn.execute("INSERT INTO terms_fts(terms_fts) VALUES('rebuild')")
+            conn.commit()
+            logger.info("全文索引重建完成")
+        except sqlite3.Error as exc:
+            logger.warning("重建全文索引失败: %s", exc)
+        finally:
+            conn.close()
     
     def insert_article(self, article_data):
         """插入文章数据"""
@@ -391,40 +466,44 @@ class MedicalDatabase:
         finally:
             conn.close()
     
-    def search_articles(self, query, language='zh', category=None, limit=20):
-        """搜索文章"""
+    def search_articles(self, query, language=None, category=None, limit=20, offset=0, count_total=True):
+        """搜索文章并返回分页结果和匹配总数"""
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
-            
-            # 构建查询条件
-            where_conditions = []
+
+            limit = max(1, limit)
+            offset = max(0, offset)
+
+            where_parts = []
             params = []
-            
+
             if language:
-                where_conditions.append("language = ?")
+                where_parts.append("a.language = ?")
                 params.append(language)
-            
+
             if category:
-                where_conditions.append("category = ?")
+                where_parts.append("a.category = ?")
                 params.append(category)
-            
-            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-            
-            # 全文搜索
-            cursor.execute(f'''
+
+            where_parts.append("articles_fts MATCH ?")
+            match_params = params + [query]
+            where_clause = "WHERE " + " AND ".join(where_parts)
+
+            search_sql = f'''
                 SELECT a.id, a.title, a.excerpt, a.category, a.language,
                        a.word_count, a.quality_score,
-                       highlight(articles_fts, 0, '<mark>', '</mark>') as highlighted_title,
-                       snippet(articles_fts, 1, '<mark>', '</mark>', '...', 20) as snippet
+                       highlight(articles_fts, 0, '<mark>', '</mark>') AS highlighted_title,
+                       snippet(articles_fts, 1, '<mark>', '</mark>', '...', 20) AS snippet
                 FROM articles a
                 JOIN articles_fts ON articles_fts.rowid = a.id
                 {where_clause}
-                AND articles_fts MATCH ?
                 ORDER BY a.quality_score DESC, a.word_count DESC
-                LIMIT ?
-            ''', params + [query, limit])
-            
+                LIMIT ? OFFSET ?
+            '''
+
+            cursor.execute(search_sql, match_params + [limit, offset])
+
             results = []
             for row in cursor.fetchall():
                 results.append({
@@ -438,12 +517,24 @@ class MedicalDatabase:
                     'highlighted_title': row[7],
                     'snippet': row[8]
                 })
-            
-            return results
-            
+
+            total_results = len(results)
+            if count_total:
+                count_cursor = conn.cursor()
+                count_sql = f'''
+                    SELECT COUNT(*)
+                    FROM articles a
+                    JOIN articles_fts ON articles_fts.rowid = a.id
+                    {where_clause}
+                '''
+                count_cursor.execute(count_sql, match_params)
+                total_results = count_cursor.fetchone()[0]
+
+            return results, total_results
+
         except sqlite3.Error as e:
             logger.error(f"搜索文章失败: {e}")
-            return []
+            return [], 0
         finally:
             conn.close()
     
@@ -760,72 +851,24 @@ class QualityValidator:
             return max(0, 100 - (avg_sentence_length - 50) * 2)
 
 def main():
-    """主函数"""
+    '''主函数'''
     print("🗄️ 医学知识库数据处理和存储系统")
     print("=" * 50)
     
-    # 初始化数据库
+    # 初始化数据库并准备数据
     db = MedicalDatabase()
-    
-    # 质量验证器
-    validator = QualityValidator()
-    
-    # 向量处理器
-    vector_processor = VectorProcessor()
-    
     print("✅ 数据库初始化完成")
-    print("✅ 质量验证器准备就绪")
-    print("✅ 向量处理器准备就绪")
-    
-    # 如果有爬虫数据，尝试导入
-    if Path("data/output/crawler_results.json").exists():
-        print("\\n📥 正在导入爬虫数据...")
-        
-        with open("data/output/crawler_results.json", 'r', encoding='utf-8') as f:
-            crawler_data = json.load(f)
-        
-        articles = crawler_data.get('articles', [])
-        print(f"发现 {len(articles)} 篇爬取的文章")
-        
-        imported_count = 0
-        for article_data in articles:
-            try:
-                # 质量验证
-                validation = validator.validate_article(article_data)
-                article_data['quality_score'] = validation['quality_score']
-                
-                # 向量处理
-                if article_data.get('content'):
-                    content_vector = vector_processor.process_text(
-                        article_data['content'], 
-                        article_data.get('language', 'zh')
-                    )
-                    # 在实际应用中，这里会将向量存储到向量数据库
-                
-                # 插入数据库
-                article_id = db.insert_article(article_data)
-                
-                # 插入医学术语
-                medical_terms = article_data.get('medical_terms', [])
-                if medical_terms:
-                    db.insert_medical_terms(
-                        article_id, 
-                        medical_terms,
-                        article_data.get('language', 'zh'),
-                        article_data.get('version', 'home')
-                    )
-                
-                imported_count += 1
-                
-            except Exception as e:
-                logger.error(f"导入文章失败: {e}")
-        
-        print(f"✅ 成功导入 {imported_count} 篇文章")
-    
-    # 获取统计信息
-    print("\\n📊 数据库统计信息:")
+
+    imported_count = db.seed_from_crawler_outputs(force=True)
+    if imported_count:
+        print(f"✅ 成功导入 {imported_count} 篇爬虫文章")
+    else:
+        print("ℹ️ 未发现新的爬虫文章需要导入")
+
+    # 展示统计信息
+    print("\n📊 数据库统计信息:")
     stats = db.get_statistics()
-    
+
     for key, value in stats.items():
         if key == 'by_language':
             print(f"  按语言分布: {value}")
@@ -839,21 +882,22 @@ def main():
             print(f"  平均词数: {int(value)}")
         elif isinstance(value, int):
             print(f"  {key}: {value:,}")
-    
+
     # 测试搜索功能
     if stats.get('total_articles', 0) > 0:
-        print("\\n🔍 测试搜索功能:")
+        print("\n🔍 测试搜索功能:")
         test_queries = ["高血压", "heart", "diabetes"]
-        
+
         for query in test_queries:
-            results = db.search_articles(query, limit=5)
-            print(f"  查询 '{query}': 找到 {len(results)} 个结果")
-            
+            results, total = db.search_articles(query, limit=5)
+            print(f"  查询 '{query}': 找到 {len(results)} / {total} 个结果")
+
             if results:
                 for result in results[:3]:  # 显示前3个结果
-                    print(f"    - {result['title']} (质量: {result['quality_score']})")
-    
-    print("\\n🎉 数据处理和存储系统设置完成！")
+                    print(f"    - {result['title']} (质量: {result.get('quality_score', 'N/A')})")
+
+    print("\n🎉 数据处理和存储系统设置完成！")
+
 
 if __name__ == "__main__":
     main()

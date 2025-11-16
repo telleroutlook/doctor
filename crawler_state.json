@@ -1,0 +1,46 @@
+{
+  "last_saved": "2025-11-16T09:57:49.289269",
+  "urls_processed": 21,
+  "successful_downloads": 20,
+  "failed_downloads": 1,
+  "parse_errors": 0,
+  "duplicates_found": 0,
+  "new_articles_created": 15,
+  "existing_articles_updated": 5,
+  "processing_time": 103.20773601531982,
+  "current_url": null,
+  "error_log": [
+    {
+      "url": "https://www.msdmanuals.cn/n3wbr@nds",
+      "error": "404 Client Error: Not Found for url: https://www.msdmanuals.cn/n3wbr@nds",
+      "timestamp": "2025-11-16T09:56:20.237624"
+    }
+  ],
+  "processed_urls": [
+    "https://www.msdmanuals.cn/home/resourcespages/quick-facts",
+    "https://www.msdmanuals.cn/home/fundamentals/rehabilitation/occupational-therapy-ot",
+    "https://www.msdmanuals.cn/home/pages-with-widgets/quizzes",
+    "https://www.msdmanuals.cn/home/content/termsofuse",
+    "https://www.msdmanuals.cn/home/skin-disorders/pigment-disorders/vitiligo?sccamp=sccamp",
+    "https://www.msdmanuals.cn/home",
+    "https://www.msdmanuals.cn/home/health-topics",
+    "https://www.msdmanuals.cn/home/health-topics/",
+    "https://www.msdmanuals.cn/home/resourcespages/about-the-manuals",
+    "https://www.msdmanuals.cn/home/resource",
+    "https://www.msdmanuals.cn/home/first-aid",
+    "https://www.msdmanuals.cn/home/",
+    "https://www.msdmanuals.cn/",
+    "https://www.msdmanuals.cn/n3wbr@nds",
+    "https://www.msdmanuals.cn/home/resourcespages/disclaimer",
+    "https://www.msdmanuals.cn/home/quick-facts-blood-disorders/anemia/iron-deficiency-anemia?sccamp=sccamp",
+    "https://www.msdmanuals.cn/home/resources/common-medical-tests/common-medical-tests",
+    "https://www.msdmanuals.cn/home/pages-with-widgets/videos",
+    "https://www.msdmanuals.cn/home/content/permissions",
+    "https://www.msdmanuals.cn/home/symptoms",
+    "https://www.msdmanuals.cn/home#mainContainer"
+  ],
+  "failed_urls": [
+    "https://www.msdmanuals.cn/n3wbr@nds"
+  ],
+  "checkpoint_urls": []
+}

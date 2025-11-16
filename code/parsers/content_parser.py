@@ -6,6 +6,7 @@
 import re
 import html
 import logging
+from collections import Counter
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
@@ -70,8 +71,20 @@ class MSDContentParser:
             
             # 提取基础信息
             title = self._extract_title(soup)
-            content = self._extract_content(soup)
+            content_info = self._extract_content(soup)
+            if not content_info:
+                content_info = {
+                    'text': '',
+                    'word_count': 0,
+                    'is_landing_page': False
+                }
+            if content_info.get('is_landing_page'):
+                return None
+            content = content_info.get('text', '')
             metadata = self._extract_metadata(soup, response.url)
+            metadata['language'] = self._deduce_language(
+                metadata.get('language', ''), response.url, soup, content
+            )
             navigation = self._extract_navigation(soup)
             links = self._extract_links_from_soup(soup, response.url)
             
@@ -92,14 +105,29 @@ class MSDContentParser:
                 'links': links,
                 'medical_terms': medical_terms,
                 'media': media,
-                'word_count': len(content.split()),
+                'word_count': content_info.get('word_count', len(content.split())),
                 'extracted_at': datetime.utcnow().isoformat()
             }
-            
-            # 数据验证
-            if not self._validate_data(parsed_data):
-                logger.warning(f"数据验证失败: {response.url}")
-            
+            valid, validation_issues = self._validate_data(parsed_data)
+            parsed_data['validation'] = {
+                'valid': valid,
+                'issues': validation_issues,
+                'metadata_snapshot': metadata.copy()
+            }
+
+            if not valid:
+                metadata_summary = {
+                    key: metadata.get(key)
+                    for key in ('language', 'category', 'version')
+                    if metadata.get(key)
+                }
+                logger.warning(
+                    "数据验证失败: %s | issues=%s | metadata=%s",
+                    response.url,
+                    validation_issues,
+                    metadata_summary or {}
+                )
+
             return parsed_data
             
         except Exception as e:
@@ -143,17 +171,71 @@ class MSDContentParser:
         for selector in content_selectors:
             content_elem = soup.select_one(selector)
             if content_elem:
-                # 提取文本内容
                 content = self._extract_text_content(content_elem)
+                word_count = len(content.split())
                 if len(content) > 100:  # 确保内容有意义
-                    return content
+                    return {
+                        'text': content,
+                        'word_count': word_count,
+                        'selector': selector,
+                        'fallback': False,
+                        'is_landing_page': False
+                    }
         
         # 如果没有找到主要内容区域，尝试获取body
         body = soup.find('body')
         if body:
-            return self._extract_text_content(body)
+            text = self._extract_text_content(body)
+            word_count = len(text.split())
+            return {
+                'text': text,
+                'word_count': word_count,
+                'selector': 'body',
+                'fallback': True,
+                'is_landing_page': self._is_nav_heavy_fallback(soup, text, word_count)
+            }
         
-        return ""
+        return {
+            'text': '',
+            'word_count': 0,
+            'selector': None,
+            'fallback': False,
+            'is_landing_page': False
+        }
+
+    def _is_nav_heavy_fallback(self, soup, text, word_count):
+        """判断在回退到 body 时是否为导航/摘要页面"""
+        if not text or word_count == 0:
+            return True
+
+        if soup.find('main') or soup.find('article'):
+            return False
+
+        nav_words = []
+        for nav in soup.find_all('nav'):
+            nav_text = self._clean_text(nav.get_text())
+            if nav_text:
+                nav_words.extend([token for token in nav_text.split() if token])
+
+        nav_word_count = len(nav_words)
+        nav_ratio = nav_word_count / max(word_count, 1)
+        repeated_ratio = self._max_token_repeat_ratio(text.lower().split())
+
+        low_word_content = word_count < 32
+        nav_dominated = nav_word_count > 0 and nav_ratio > 0.45
+        repeated_pattern = repeated_ratio > 0.55
+
+        return low_word_content and (nav_dominated or repeated_pattern)
+
+    def _max_token_repeat_ratio(self, tokens):
+        """计算最常见词在文本中所占比例"""
+        tokens = [token for token in tokens if token]
+        if not tokens:
+            return 1.0
+
+        counter = Counter(tokens)
+        most_common = counter.most_common(1)[0][1]
+        return most_common / len(tokens)
     
     def _extract_text_content(self, element):
         """从元素中提取文本内容"""
@@ -242,7 +324,47 @@ class MSDContentParser:
                     continue
         
         return metadata
-    
+
+    def _deduce_language(self, declared_language, url, soup, content):
+        """基于元数据、HTML lang或文本内容推断语言"""
+        normalized = (declared_language or '').strip().lower()
+        if normalized.startswith('zh'):
+            return 'zh'
+
+        html_lang = self._get_html_lang(soup)
+        if html_lang and html_lang.startswith('zh'):
+            return 'zh'
+
+        parsed_url = urlparse(url)
+        netloc = parsed_url.netloc.lower()
+        if netloc.endswith('.cn') or 'msdmanuals.cn' in netloc:
+            return 'zh'
+
+        if self._has_chinese_text(content):
+            return 'zh'
+
+        return 'en'
+
+    def _get_html_lang(self, soup):
+        """提取HTML标签中的lang属性"""
+        html_tag = soup.find('html')
+        if html_tag:
+            lang = html_tag.get('lang', '')
+            if lang:
+                return lang.strip().lower()
+        return ''
+
+    def _has_chinese_text(self, content, min_chars=20, ratio=0.15):
+        """判断文本中是否包含足够的中文字符"""
+        if not content:
+            return False
+
+        chinese_chars = re.findall(r'[\u4e00-\u9fff]', content)
+        if len(chinese_chars) < min_chars:
+            return False
+
+        return len(chinese_chars) / max(len(content), 1) >= ratio
+
     def _determine_version(self, url):
         """从URL确定版本"""
         parsed_url = urlparse(url)
@@ -473,19 +595,21 @@ class MSDContentParser:
     
     def _validate_data(self, data):
         """验证解析数据的质量"""
+        issues = []
+
         # 检查必需字段
         if not data.get('title') or len(data['title']) < 5:
-            return False
+            issues.append('标题缺失或长度不足')
         
         if not data.get('content') or len(data['content']) < 50:
-            return False
+            issues.append('内容缺失或长度不足')
         
         # 检查内容质量
         word_count = data.get('word_count', 0)
         if word_count < 10:  # 至少10个词
-            return False
-        
-        return True
+            issues.append('词数不足')
+
+        return len(issues) == 0, issues
     
     def extract_links(self, response):
         """提取链接（兼容性方法）"""

@@ -173,7 +173,12 @@ class DataProcessor:
         # 验证语言
         if cleaned.get('language'):
             cleaned['language'] = self._normalize_language(cleaned['language'])
-        
+
+        # 直接在顶层保留语言字段，便于后续处理
+        metadata_language = cleaned.get('metadata', {}).get('language')
+        if metadata_language:
+            cleaned['language'] = metadata_language
+
         return cleaned
     
     def _clean_author_info(self, author):

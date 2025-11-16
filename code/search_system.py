@@ -34,34 +34,41 @@ class SearchAPI:
         start_time = time.time()
         
         try:
-            # 执行搜索
-            results = self.db.search_articles(
+            results, total_matches = self.db.search_articles(
                 query=query,
                 language=language,
                 category=category,
-                limit=limit
+                limit=limit,
+                offset=offset
             )
             
-            # 应用分页
-            paginated_results = results[offset:offset+limit]
-            
             # 记录搜索历史
-            self._log_search(query, len(paginated_results), time.time() - start_time)
-            
-            # 构建响应
+            self._log_search(query, len(results), time.time() - start_time)
+
+            next_offset = offset + len(results) if offset + len(results) < total_matches else None
+            meta = {
+                'limit': limit,
+                'offset': offset,
+                'returned_results': len(results),
+                'total_results': total_matches,
+                'has_more': next_offset is not None,
+                'next_offset': next_offset
+            }
+
             response = {
                 'success': True,
                 'query': query,
-                'total_results': len(results),
-                'returned_results': len(paginated_results),
+                'total_results': total_matches,
+                'returned_results': len(results),
+                'meta': meta,
                 'execution_time': round(time.time() - start_time, 3),
-                'results': paginated_results,
+                'results': results,
                 'suggestions': self._generate_suggestions(query),
                 'timestamp': datetime.utcnow().isoformat()
             }
-            
+
             return response
-            
+
         except Exception as e:
             logger.error(f"搜索失败: {e}")
             return {
@@ -79,40 +86,50 @@ class SearchAPI:
         
         try:
             # 基础搜索
-            results = self.db.search_articles(
+            raw_results, _ = self.db.search_articles(
                 query=query,
                 language=filters.get('language'),
                 category=filters.get('category'),
-                limit=limit * 2  # 获取更多结果以便筛选
+                limit=limit * 2,  # 获取更多结果以便筛选
+                count_total=False
             )
+            
+            filtered_results = raw_results
             
             # 应用额外筛选
             if filters.get('min_quality_score'):
-                results = [r for r in results if r.get('quality_score', 0) >= filters['min_quality_score']]
-            
+                filtered_results = [r for r in filtered_results if r.get('quality_score', 0) >= filters['min_quality_score']]
+                
             if filters.get('min_word_count'):
-                results = [r for r in results if r.get('word_count', 0) >= filters['min_word_count']]
+                filtered_results = [r for r in filtered_results if r.get('word_count', 0) >= filters['min_word_count']]
             
             # 排序
             if sort_by == 'relevance':
-                results.sort(key=lambda x: x.get('quality_score', 0), reverse=True)
+                filtered_results.sort(key=lambda x: x.get('quality_score', 0), reverse=True)
             elif sort_by == 'date':
-                results.sort(key=lambda x: x.get('extracted_at', ''), reverse=True)
+                filtered_results.sort(key=lambda x: x.get('extracted_at', ''), reverse=True)
             elif sort_by == 'word_count':
-                results.sort(key=lambda x: x.get('word_count', 0), reverse=True)
+                filtered_results.sort(key=lambda x: x.get('word_count', 0), reverse=True)
             
             # 应用限制
-            final_results = results[:limit]
+            final_results = filtered_results[:limit]
             
             # 记录搜索
             self._log_search(query, len(final_results), time.time() - start_time)
             
+            meta = {
+                'filters_applied': filters,
+                'sort_by': sort_by,
+                'limit': limit,
+                'returned_results': len(final_results),
+                'candidate_pool': len(filtered_results)
+            }
+            
             return {
                 'success': True,
                 'query': query,
-                'filters_applied': filters,
-                'sort_by': sort_by,
-                'total_results': len(results),
+                'meta': meta,
+                'total_results': len(filtered_results),
                 'returned_results': len(final_results),
                 'execution_time': round(time.time() - start_time, 3),
                 'results': final_results,
