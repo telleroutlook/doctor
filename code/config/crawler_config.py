@@ -1,6 +1,50 @@
 # 爬虫配置
 import random
 
+# 支持的语言版本及入口URL
+def _language_entry(start_url, extra_urls=None):
+    """统一生成语言入口配置"""
+    entry = {"start_url": start_url}
+    if extra_urls:
+        entry["extra_urls"] = list(extra_urls)
+    return entry
+
+
+LANGUAGE_VERSION_URLS = {
+    "home": {
+        "en": _language_entry(
+            "https://www.msdmanuals.com/home/",
+            extra_urls=["health-topics/"]
+        ),
+        "zh": _language_entry(
+            "https://www.msdmanuals.cn/home/",
+            extra_urls=["health-topics/", "https://www.msdmanuals.cn/"]
+        ),
+        "de": _language_entry("https://www.msdmanuals.com/de/"),
+        "es": _language_entry("https://www.msdmanuals.com/es/"),
+        "fr": _language_entry("https://www.msdmanuals.com/fr/"),
+        "it": _language_entry("https://www.msdmanuals.com/it/"),
+        "ja-jp": _language_entry("https://www.msdmanuals.com/ja-jp/"),
+        "ko": _language_entry("https://www.msdmanuals.com/ko/"),
+        "pt": _language_entry("https://www.msdmanuals.com/pt/"),
+        "ru": _language_entry("https://www.msdmanuals.com/ru/"),
+        "ru-ru": _language_entry("https://www.msdmanuals.com/ru-ru/"),
+        "ar": _language_entry("https://www.msdmanuals.com/ar/"),
+        "vi": _language_entry("https://www.msdmanuals.com/vi/"),
+        "uk": _language_entry("https://www.msdmanuals.com/uk/"),
+        "hi": _language_entry("https://www.msdmanuals.com/hi/"),
+        "sw": _language_entry("https://www.msdmanuals.com/sw/"),
+        "id": _language_entry("https://www.msdmanuals.com/id/")
+    },
+    "professional": {
+        "en": _language_entry("https://www.msdmanuals.com/professional/"),
+        "zh": _language_entry("https://www.msdmanuals.cn/professional/")
+    },
+    "veterinary": {
+        "en": _language_entry("https://www.msdvetmanual.com/")
+    }
+}
+
 # 爬虫基础配置
 CRAWLER_CONFIG = {
     "max_workers": 3,
